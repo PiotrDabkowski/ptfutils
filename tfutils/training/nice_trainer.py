@@ -8,6 +8,27 @@ INFO_STRING='{batches_done}/{batches_per_epoch} - time: {comp_time:.3f} - data: 
 
 
 
+
+def optimistic_restore(session, save_file, var_list=None):
+    reader = tf.train.NewCheckpointReader(save_file)
+    saved_shapes = reader.get_variable_to_shape_map()
+    restore_vars = []
+    if var_list is None:
+        var_list = tf.global_variables()
+    for var in var_list:
+        name = var.name.split(':')[0]
+        if name not in saved_shapes:
+            print var.name, 'not found in checkpoint'
+        else:
+            if var.get_shape().as_list() == saved_shapes[name]:
+                restore_vars.append(var)
+            else:
+                print 'Shape mismatch for', name, 'skipping restore!'
+    saver = tf.train.Saver(restore_vars)
+    saver.restore(session, save_file)
+
+
+
 class NiceTrainer:
     def __init__(self,
                  sess,
@@ -92,7 +113,7 @@ class NiceTrainer:
             print 'Performing periodic save...'
             self.save(periodic_check=True)
 
-    def restore(self, allow_restore_crash=True):
+    def restore(self, allow_restore_crash=True, relaxed=False):
         """ If you set allow_restore_crash to True we will
         check whether automatic periodic save was made after standard save and if this is the case
         we will continue from periodic save."""
@@ -116,18 +137,24 @@ class NiceTrainer:
             if periodic_nt is not None and (std_nt is None or std_nt['last_save_time'] < periodic_nt['last_save_time']):
                 # restore from crash
                 print 'Restoring from periodic save (maybe in the middle of the epoch). Training will be continued.'
-                self.saver.restore(self.sess, periodic_checkpoint.model_checkpoint_path)
+                self._restore(periodic_checkpoint.model_checkpoint_path, relaxed)
                 self._restore_nt(periodic_nt, continue_epoch=True)
                 return
 
         if std_checkpoint and std_checkpoint.model_checkpoint_path:
             print 'Loading model from', std_checkpoint.model_checkpoint_path
-            self.saver.restore(self.sess, std_checkpoint.model_checkpoint_path)
+            self._restore(std_checkpoint.model_checkpoint_path, relaxed)
             self._restore_nt(std_nt)
             return
         else:
             print 'No saved models to restore from'
             return
+
+    def _restore(self, path, relaxed):
+        if not relaxed:
+            self.saver.restore(self.sess, path)
+        else:
+            optimistic_restore(self.sess, path, var_list=self.saver._var_list)
 
     def _save_nt(self, save_path):
         nt = {
@@ -230,7 +257,6 @@ class NiceTrainer:
 
         self.measured_batches_per_sec = batches_per_sec
 
-        print
 
 
     def validate(self):
@@ -275,12 +301,16 @@ class NiceTrainer:
 def _caclulate_batch_top_n_hits(probs, labels, n, avg_preds_over):
     ''' probs is a probabilit matrix (BS, N) labels is a vector (BS,)  with every entry smaller int than N'''
     hits = 0
-    if avg_preds_over != 1:
+    if 1:
         assert len(probs) % avg_preds_over == 0
-        probs = [np.mean(probs[i:i+avg_preds_over], axis=0) for i in xrange(0, avg_preds_over, len(probs))]
+        probs = [np.mean(probs[i:i+avg_preds_over, :], axis=0) for i in xrange(0, len(probs), avg_preds_over)]
+        for i in xrange(0, len(probs), avg_preds_over):
+            assert all(labels[i:i+avg_preds_over] == labels[i])
+        labels = [labels[i] for i in xrange(0, len(labels), avg_preds_over)]
+    assert len(probs)==len(labels)
     for p, l in zip(probs, labels):
         hits += np.sum(p>p[l]) < n
-    return hits
+    return hits*avg_preds_over
 
 
 def accuracy_calc_op(n=1, avg_preds_over=1):
@@ -295,4 +325,11 @@ def accuracy_calc_op(n=1, avg_preds_over=1):
     def acc_op(extra_vars, batch):
         return _caclulate_batch_top_n_hits(extra_vars['probs'], batch[1], n, avg_preds_over) / float(len(batch[1]))
     return acc_op
+
+#
+# print accuracy_calc_op(1, 1)({'probs': np.array([[1., 0.],
+#                                                 [0.4, 0.5]])}, (0, (0,0)))
+
+
+
 

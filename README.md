@@ -1,4 +1,6 @@
-###My personal TensorFlow utils
+###My personal TensorFlow utils - still under development, use with caution.
+
+
 
 <hr>
 
@@ -10,6 +12,7 @@ For example, whole ImageNet data augmentation + batch generator pipeline has les
 ```python
     from tfutils import *
 
+    # image_pipeline takes an image path and returns preprocessed image as np array (RGB)
     image_pipeline = compose_ops([
         load(),
         random_crop(IMAGE_SIZE, AREA_RANGE, ASPECT_RATIO_RANGE),
@@ -17,22 +20,25 @@ For example, whole ImageNet data augmentation + batch generator pipeline has les
         normalize(IMAGE_NET_PIXEL_MEAN, IMAGE_NET_PIXEL_STD),
         random_lighting(LIGHTNING_APLHA_STD, IMG_NET_PIXEL_EIG_VAL, IMG_NET_PIXEL_EIG_VEC)
     ])
-    
+
+    # label_pipeline takes image path and returns a label
     label_pipeline = compose_ops([
         folder_name(),
         key_to_element(SYNSET_TO_CLASS_ID)
     ])
-    
+
+    # example_pipeline for each input image path will return a tuple (Image, Label)
     example_pipeline = for_each(parallelise_ops([
         image_pipeline,
         label_pipeline
     ]))
 
+
     bm = BatchManager(
         example_pipeline,
         TRAIN_IMAGE_PATHS,
         generic_batch_composer(np.float32, np.int32),
-        batch_size,
+        BATCH_SIZE,
         shuffle_examples=True,
         num_workers=6
     )

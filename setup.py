@@ -7,7 +7,7 @@ except ImportError:
 # python setup.py sdist upload -r pypi
 setup(
     name='ptfutils',
-    version='0.0.9',
+    version='0.0.21',
     packages=['tfutils', 'tfutils.data', 'tfutils.training'],
     url='https://github.com/PiotrDabkowski/',
     license='MIT',

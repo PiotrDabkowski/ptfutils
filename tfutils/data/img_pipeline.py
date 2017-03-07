@@ -50,7 +50,7 @@ def random_crop(size, area_range, aspect_range):
             y_off = random.randrange(y_space + 1)
 
             cropped = im[y_off:y_off+h, x_off:x_off+w]
-            return cv2.resize(cropped, size, interpolation=cv2.INTER_CUBIC)
+            return cv2.resize(cropped, size, interpolation=cv2.INTER_LINEAR)
 
         # a strange image, just take a largest square central crop and resize to required shape (implemented by fallback)...
         return fallback(im)
@@ -66,7 +66,7 @@ def square_centrer_crop_resize(size):
         xx = int((im.shape[1] - short_edge) / 2)
 
         max_square = im[yy: yy + short_edge, xx: xx + short_edge]
-        return cv2.resize(max_square, size, interpolation=cv2.INTER_CUBIC)
+        return cv2.resize(max_square, size, interpolation=cv2.INTER_LINEAR)
     return square_centrer_crop_resize_op
 
 
@@ -101,7 +101,7 @@ def crop_at(crop_size, position='CC'):
 
 def resize(size):
     def resize_op(im):
-        return cv2.resize(im, size, interpolation=cv2.INTER_CUBIC) # simple linear resize
+        return cv2.resize(im, size, interpolation=cv2.INTER_LINEAR) # simple linear resize
     return resize_op
 
 
